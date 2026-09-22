@@ -335,8 +335,6 @@ export default function Home() {
 
               <div className="card"><h3>Rekomendasi Berdasarkan Temuan</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul><p className="footnote">Rekomendasi merupakan interpretasi awal berdasarkan pola teks. Verifikasi dengan kondisi nyata sebelum digunakan sebagai dasar keputusan.</p></div>
 
-              <details className="card process-details"><summary>Lihat bagaimana NLP bekerja</summary><div className="process-flow"><span>Data teks</span><b>→</b><span>Normalisasi</span><b>→</b><span>Tokenisasi</span><b>→</b><span>Sentimen</span><b>→</b><span>Kategori</span><b>→</b><span>Kata kunci</span><b>→</b><span>Ringkasan</span><b>→</b><span>Wawasan</span></div></details>
-
             </>}
           </>}
 

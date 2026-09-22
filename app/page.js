@@ -202,7 +202,7 @@ export default function Home() {
       setSourceMeta(initialSourceMeta);
       const message = String(err?.message || err || 'Kesalahan tidak diketahui.');
       const compatibilityHint = (message.includes('toHex') || message.includes('getOrInsertComputed'))
-        ? ' Komponen PDF.js lama masih tersaji pada deployment/peramban. Versi terbaru memakai build legacy resmi PDF.js. Jalankan npm install, deploy ulang tanpa cache, lalu muat ulang halaman.'
+        ? ' Komponen PDF.js lama masih tersaji pada deployment. Versi terbaru memakai build legacy resmi PDF.js. Jalankan npm install, deploy ulang tanpa cache, lalu muat ulang halaman.'
         : '';
       setFileMessage(`Gagal membaca berkas: ${message}${compatibilityHint}`);
     } finally {
@@ -212,7 +212,7 @@ export default function Home() {
   }
 
   function resetAll() {
-    if (!confirm('Hapus seluruh data proyek yang tersimpan pada peramban ini?')) return;
+    if (!confirm('Hapus seluruh data proyek yang tersimpan pada cache browser ini?')) return;
     setProject(initialProject);
     setRawText('');
     setTexts([]);
@@ -251,7 +251,7 @@ export default function Home() {
           <div><h1>Text2Insight Lab</h1><p>Dari teks menjadi informasi, wawasan, dan tindakan</p></div>
         </div>
         <div className="top-actions">
-          <span className="status-dot">Tersimpan otomatis di peramban</span>
+          <span className="status-dot">Tersimpan otomatis di cache browser</span>
           <button className="ghost" onClick={resetAll}>Atur Ulang</button>
         </div>
       </header>
@@ -286,7 +286,7 @@ export default function Home() {
             <InfoBox tone="warning"><b>Perlindungan data.</b> Jangan unggah kata sandi, NIK, nomor rekening, rekam medis, data pelanggan rahasia, atau informasi internal yang tidak diizinkan.</InfoBox>
             <div className="card">
               <div className="upload-row">
-                <div><b>Unggah data atau dokumen</b><p>Format: TXT, CSV, JSON, atau PDF. PDF maksimum 20 MB dan 120 halaman. Teks diekstrak langsung di peramban lalu dianalisis sebagai segmen-segmen dokumen.</p></div>
+                <div><b>Unggah data atau dokumen</b><p>Format: TXT, CSV, JSON, atau PDF. PDF maksimum 20 MB dan 120 halaman. Teks diekstrak langsung di browser lalu dianalisis sebagai segmen-segmen dokumen.</p></div>
                 <input ref={fileRef} type="file" accept=".txt,.csv,.json,.pdf,text/plain,text/csv,application/json,application/pdf" onChange={handleFile} hidden />
                 <button className="secondary" onClick={() => fileRef.current?.click()} disabled={isReadingFile}>{isReadingFile ? 'Membaca Berkas...' : 'Pilih Berkas'}</button>
               </div>
@@ -356,7 +356,7 @@ export default function Home() {
           <div className="nav-actions no-print"><button className="ghost" onClick={prev} disabled={step === STEPS[0][0]}>← Sebelumnya</button><span>Langkah {STEPS.findIndex(x=>x[0]===step)+1} dari {STEPS.length}</span><button onClick={next} disabled={step === STEPS[STEPS.length-1][0]}>Berikutnya →</button></div>
         </section>
       </div>
-      <footer className="no-print">Text2Insight Lab · Analisis NLP berbasis bukti · Data tersimpan lokal pada peramban pengguna</footer>
+      <footer className="no-print">Text2Insight Lab · Analisis NLP berbasis bukti · Data tersimpan lokal pada cache browser pengguna</footer>
     </main>
   );
 }

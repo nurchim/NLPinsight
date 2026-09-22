@@ -148,3 +148,13 @@ Hasil NLP merupakan indikasi awal. Wawasan dan rekomendasi perlu dibaca bersama 
 ## Privasi
 
 Proses analisis utama berjalan di peramban. Data proyek disimpan pada `localStorage` bila kapasitas peramban mencukupi. Jangan memasukkan data pribadi, rahasia, atau data organisasi yang tidak diizinkan.
+
+
+## Alur 4 Halaman
+
+1. **Konteks** — bidang/tempat kerja, tujuan analisis, sumber data, dan kurun waktu data.
+2. **Data / Dokumen** — tempel teks atau unggah TXT, CSV, JSON, dan PDF.
+3. **Hasil NLP** — temuan, peringkasan teks, sentimen, topik/istilah, kata kunci, entitas, bukti, wawasan, rekomendasi, serta tombol **Ekspor JSON**.
+4. **Laporan** — laporan terstruktur yang siap dibaca dan memiliki tombol **Cetak / Simpan PDF**.
+
+Tombol ekspor JSON hanya tersedia pada halaman Hasil NLP. Tombol Cetak / Simpan PDF hanya tersedia pada halaman Laporan.

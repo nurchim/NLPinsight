@@ -15,7 +15,8 @@ import { extractPdfTexts } from '../lib/pdf';
 const STEPS = [
   ['konteks', '1', 'Konteks'],
   ['data', '2', 'Data / Dokumen'],
-  ['hasil', '3', 'Hasil dan Laporan']
+  ['hasil', '3', 'Hasil NLP'],
+  ['laporan', '4', 'Laporan']
 ];
 
 const initialSourceMeta = {
@@ -256,10 +257,10 @@ export default function Home() {
           <div className="side-title">Alur Analisis</div>
           {STEPS.map(([id, n, label]) => (
             <button key={id} onClick={() => setStep(id)} className={`step-button ${step === id ? 'active' : ''}`}>
-              <span>{n}</span><div>{label}<small>{id === 'hasil' ? `${texts.length} teks` : ''}</small></div>
+              <span>{n}</span><div>{label}<small>{id === 'hasil' || id === 'laporan' ? `${texts.length} teks` : ''}</small></div>
             </button>
           ))}
-          <div className="flow-card"><b>Alur sederhana</b><p>Konteks → Data → NLP → Wawasan → Laporan</p></div>
+          <div className="flow-card"><b>Alur sederhana</b><p>Konteks → Data → Hasil NLP → Laporan</p></div>
         </aside>
 
         <section className="content">
@@ -294,7 +295,7 @@ export default function Home() {
           </>}
 
           {step === 'hasil' && <>
-            <div className="page-heading no-print"><div><span className="eyebrow">LANGKAH 3</span><h2>Hasil NLP dan Wawasan</h2><p>Temuan, ringkasan teks, bukti, rekomendasi, dan laporan tersusun otomatis.</p></div><div className="button-row"><button className="secondary" onClick={exportJson}>Ekspor JSON</button><button onClick={()=>window.print()}>Cetak / Simpan PDF</button></div></div>
+            <div className="page-heading no-print"><div><span className="eyebrow">LANGKAH 3</span><h2>Hasil NLP dan Wawasan</h2><p>Temuan, ringkasan teks, bukti, dan rekomendasi tersusun otomatis dari data yang dianalisis.</p></div><div className="button-row"><button className="secondary" onClick={exportJson}>Ekspor JSON</button><button onClick={() => setStep('laporan')}>Lihat Laporan →</button></div></div>
             {!texts.length ? <InfoBox tone="warning">Belum ada data. Masukkan data pada langkah 2 lalu tekan <b>Analisis NLP Sekarang</b>.</InfoBox> : <>
               <div className="metrics-grid">
                 <Metric label={sourceMeta.fileType === 'PDF' ? 'Segmen PDF dianalisis' : 'Teks dianalisis'} value={texts.length}/>
@@ -332,18 +333,23 @@ export default function Home() {
 
               <details className="card process-details"><summary>Lihat bagaimana NLP bekerja</summary><div className="process-flow"><span>Data teks</span><b>→</b><span>Normalisasi</span><b>→</b><span>Tokenisasi</span><b>→</b><span>Sentimen</span><b>→</b><span>Kategori</span><b>→</b><span>Kata kunci</span><b>→</b><span>Ringkasan</span><b>→</b><span>Wawasan</span></div></details>
 
-              <article className="report">
-                <div className="report-cover"><span>TEXT2INSIGHT LAB</span><h2>{project.title || 'Laporan Analisis NLP'}</h2><p>From Text to Insight — Menggali Informasi Data Dunia Kerja dengan Natural Language Processing</p></div>
-                <section><h3>1. Konteks dan Sumber Data</h3><dl><dt>Bidang / tempat kerja</dt><dd>{project.workplace || '-'}</dd><dt>Tujuan analisis</dt><dd>{project.purpose || '-'}</dd><dt>Sumber data</dt><dd>{project.dataSource || '-'}</dd><dt>Kurun waktu data</dt><dd>{project.dataPeriod || '-'}</dd>{sourceMeta.fileName && <><dt>Berkas dianalisis</dt><dd>{sourceMeta.fileName}</dd><dt>Jenis berkas</dt><dd>{sourceMeta.fileType || '-'}</dd></>}{sourceMeta.fileType === 'PDF' && <><dt>Jumlah halaman PDF</dt><dd>{sourceMeta.pageCount}</dd><dt>Halaman dengan teks</dt><dd>{sourceMeta.pagesWithText}</dd></>}</dl></section>
-                <section><h3>2. Ringkasan Data</h3><div className="report-metrics"><Metric label={sourceMeta.fileType === 'PDF' ? 'Jumlah segmen' : 'Jumlah teks'} value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Rata-rata" value={`${analysis.averageLength} kata`}/></div></section>
-                <section><h3>3. Ringkasan Teks</h3><p>{analysis.summary.join(' ') || '-'}</p></section>
-                <section><h3>4. Temuan NLP</h3><div className="grid two align-start"><div><h4>Sentimen</h4>{['Negatif','Netral','Positif'].map(k=><Bar key={k} label={k} value={analysis.sentimentCounts[k]} max={texts.length} suffix={` (${pct(analysis.sentimentCounts[k],texts.length)}%)`} />)}</div><div><h4>{sourceMeta.fileType === 'PDF' ? 'Istilah / tema dominan' : 'Topik / kategori'}</h4>{sourceMeta.fileType === 'PDF' ? analysis.keywords.slice(0,5).map(x=><Bar key={x.term} label={x.term} value={x.count} max={Math.max(...analysis.keywords.map(k=>k.count),1)} />) : analysis.categoriesRanked.slice(0,5).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div></div>{sourceMeta.fileType === 'PDF' && analysis.entitiesRanked.length > 0 && <><h4>Entitas penting</h4><ul>{analysis.entitiesRanked.slice(0,8).map((e,i)=><li key={`${e.type}-${e.value}-${i}`}>{e.type}: {e.value} ({e.count} kali)</li>)}</ul></>}</section>
-                <section><h3>5. Wawasan</h3><p>{insightSummary}</p><h4>Bukti pendukung</h4><ul>{evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></section>
-                <section><h3>6. Rekomendasi</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul></section>
-                <section><h3>7. Keterbatasan</h3><p>Hasil hanya merepresentasikan data yang dimasukkan dan kurun waktu yang ditetapkan. Analisis sentimen, kategori, serta ringkasan bersifat indikatif dan perlu dibaca bersama konteks organisasi. Untuk PDF, aplikasi hanya menganalisis teks yang dapat diekstrak; dokumen hasil pindai tanpa lapisan teks memerlukan OCR.</p></section>
-                <section className="method-note"><h3>Catatan Metode</h3><p>Analisis memakai ekstraksi teks PDF dengan PDF.js (bila sumber berupa PDF), normalisasi teks, tokenisasi, kamus sentimen, klasifikasi berbasis kata kunci, ekstraksi kata kunci, dan peringkasan teks (text summarization) ekstraktif. Pendekatan dibuat transparan agar proses NLP mudah dipahami oleh mahasiswa.</p></section>
-              </article>
             </>}
+          </>}
+
+
+          {step === 'laporan' && <>
+            <div className="page-heading no-print"><div><span className="eyebrow">LANGKAH 4</span><h2>Laporan Analisis NLP</h2><p>Laporan akhir merangkum konteks, data, temuan, wawasan, bukti, rekomendasi, dan keterbatasan analisis.</p></div><div className="button-row"><button className="secondary" onClick={() => setStep('hasil')}>← Kembali ke Hasil</button><button onClick={() => window.print()}>Cetak / Simpan PDF</button></div></div>
+            {!texts.length ? <InfoBox tone="warning">Belum ada data untuk dilaporkan. Masukkan data pada langkah 2, lalu lakukan analisis NLP.</InfoBox> : <article className="report">
+              <div className="report-cover"><span>TEXT2INSIGHT LAB</span><h2>{project.title || 'Laporan Analisis NLP'}</h2><p>From Text to Insight — Menggali Informasi Data Dunia Kerja dengan Natural Language Processing</p></div>
+              <section><h3>1. Konteks dan Sumber Data</h3><dl><dt>Bidang / tempat kerja</dt><dd>{project.workplace || '-'}</dd><dt>Tujuan analisis</dt><dd>{project.purpose || '-'}</dd><dt>Sumber data</dt><dd>{project.dataSource || '-'}</dd><dt>Kurun waktu data</dt><dd>{project.dataPeriod || '-'}</dd>{sourceMeta.fileName && <><dt>Berkas dianalisis</dt><dd>{sourceMeta.fileName}</dd><dt>Jenis berkas</dt><dd>{sourceMeta.fileType || '-'}</dd></>}{sourceMeta.fileType === 'PDF' && <><dt>Jumlah halaman PDF</dt><dd>{sourceMeta.pageCount}</dd><dt>Halaman dengan teks</dt><dd>{sourceMeta.pagesWithText}</dd></>}</dl></section>
+              <section><h3>2. Ringkasan Data</h3><div className="report-metrics"><Metric label={sourceMeta.fileType === 'PDF' ? 'Jumlah segmen' : 'Jumlah teks'} value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Rata-rata" value={`${analysis.averageLength} kata`}/></div></section>
+              <section><h3>3. Ringkasan Teks</h3><p>{analysis.summary.join(' ') || '-'}</p></section>
+              <section><h3>4. Temuan NLP</h3><div className="grid two align-start"><div><h4>Sentimen</h4>{['Negatif','Netral','Positif'].map(k=><Bar key={k} label={k} value={analysis.sentimentCounts[k]} max={texts.length} suffix={` (${pct(analysis.sentimentCounts[k],texts.length)}%)`} />)}</div><div><h4>{sourceMeta.fileType === 'PDF' ? 'Istilah / tema dominan' : 'Topik / kategori'}</h4>{sourceMeta.fileType === 'PDF' ? analysis.keywords.slice(0,5).map(x=><Bar key={x.term} label={x.term} value={x.count} max={Math.max(...analysis.keywords.map(k=>k.count),1)} />) : analysis.categoriesRanked.slice(0,5).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div></div>{sourceMeta.fileType === 'PDF' && analysis.entitiesRanked.length > 0 && <><h4>Entitas penting</h4><ul>{analysis.entitiesRanked.slice(0,8).map((e,i)=><li key={`${e.type}-${e.value}-${i}`}>{e.type}: {e.value} ({e.count} kali)</li>)}</ul></>}</section>
+              <section><h3>5. Wawasan</h3><p>{insightSummary}</p><h4>Bukti pendukung</h4><ul>{evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></section>
+              <section><h3>6. Rekomendasi</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul></section>
+              <section><h3>7. Keterbatasan</h3><p>Hasil hanya merepresentasikan data yang dimasukkan dan kurun waktu yang ditetapkan. Analisis sentimen, kategori, serta ringkasan bersifat indikatif dan perlu dibaca bersama konteks organisasi. Untuk PDF, aplikasi hanya menganalisis teks yang dapat diekstrak; dokumen hasil pindai tanpa lapisan teks memerlukan OCR.</p></section>
+              <section className="method-note"><h3>Catatan Metode</h3><p>Analisis memakai ekstraksi teks PDF dengan PDF.js (bila sumber berupa PDF), normalisasi teks, tokenisasi, kamus sentimen, klasifikasi berbasis kata kunci, ekstraksi kata kunci, dan peringkasan teks (text summarization) ekstraktif. Pendekatan dibuat transparan agar proses NLP mudah dipahami oleh mahasiswa.</p></section>
+            </article>}
           </>}
 
           <div className="nav-actions no-print"><button className="ghost" onClick={prev} disabled={step === STEPS[0][0]}>← Sebelumnya</button><span>Langkah {STEPS.findIndex(x=>x[0]===step)+1} dari {STEPS.length}</span><button onClick={next} disabled={step === STEPS[STEPS.length-1][0]}>Berikutnya →</button></div>

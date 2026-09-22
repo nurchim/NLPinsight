@@ -159,26 +159,20 @@ Proses analisis utama berjalan di peramban. Data proyek disimpan pada `localStor
 
 Tombol ekspor JSON hanya tersedia pada halaman Hasil NLP. Tombol Cetak / Simpan PDF hanya tersedia pada halaman Laporan.
 
-## Perbaikan kompatibilitas PDF.js (`toHex is not a function`)
+## Kompatibilitas PDF.js (v1.2.2)
 
-Versi 1.2.1 menambahkan lapisan kompatibilitas untuk `Uint8Array.prototype.toHex()` yang digunakan PDF.js 6. Sebagian browser atau WebView yang lebih lama belum menyediakan API tersebut sehingga unggah PDF dapat gagal dengan pesan `toHex is not a function`.
+Versi ini tidak lagi mengandalkan worker modern yang ditambal dengan polyfill satu per satu. Aplikasi memakai **build legacy resmi PDF.js** untuk library dan worker sekaligus:
 
-Perbaikan diterapkan pada dua konteks:
+- `pdfjs-dist/legacy/build/pdf.mjs`
+- `pdfjs-dist/legacy/build/pdf.worker.min.mjs`
 
-- aplikasi utama sebelum `pdfjs-dist` dimuat; dan
-- Web Worker PDF.js melalui `public/pdfjs/pdf.worker.compat.mjs` yang dibuat otomatis saat `npm install`.
+Build legacy ditujukan untuk browser atau WebView yang belum memiliki seluruh API JavaScript modern. Perubahan ini menangani galat seperti `toHex is not a function` dan `getOrInsertComputed is not a function` dengan pendekatan yang lebih stabil. Library dan worker selalu berasal dari versi `pdfjs-dist` yang sama.
 
-Setelah memperbarui repositori, jalankan ulang instalasi/deployment agar `postinstall` membuat worker kompatibilitas terbaru:
+Setelah memperbarui repositori, lakukan instalasi dan deployment ulang agar worker legacy dibuat oleh `postinstall`:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Untuk Vercel, lakukan deployment ulang dari commit terbaru. Worker memakai nama berkas baru (`pdf.worker.compat.mjs`) sehingga deployment terbaru tidak bergantung pada worker lama yang mungkin tersimpan di cache.
-
-## Perbaikan kompatibilitas PDF (v1.2.1)
-
-Versi 1.2.1 memperbaiki galat `toHex is not a function` pada sebagian browser atau WebView. PDF.js 6 menggunakan API JavaScript modern `Uint8Array.prototype.toHex()`. Text2Insight kini memasang fallback kompatibilitas pada aplikasi utama **dan** Web Worker PDF.js sebelum dokumen diproses.
-
-Setelah memperbarui repositori, jalankan kembali `npm install` atau lakukan redeploy di Vercel agar berkas `public/pdfjs/pdf.worker.compat.mjs` dibuat ulang melalui skrip `postinstall`.
+Untuk Vercel, lakukan redeploy **tanpa cache**. Worker baru memakai nama `public/pdfjs/pdf.worker.legacy.min.mjs`, sehingga tidak menggunakan worker kompatibilitas lama. Setelah deployment selesai, muat ulang halaman secara paksa (hard refresh) bila browser masih menyimpan berkas lama.

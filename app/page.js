@@ -201,8 +201,8 @@ export default function Home() {
       setRawText('');
       setSourceMeta(initialSourceMeta);
       const message = String(err?.message || err || 'Kesalahan tidak diketahui.');
-      const compatibilityHint = message.includes('toHex')
-        ? ' Komponen PDF pada deployment belum terbarui. Jalankan npm install lalu deploy ulang agar worker kompatibilitas PDF.js dibuat.'
+      const compatibilityHint = (message.includes('toHex') || message.includes('getOrInsertComputed'))
+        ? ' Komponen PDF.js lama masih tersaji pada deployment/peramban. Versi terbaru memakai build legacy resmi PDF.js. Jalankan npm install, deploy ulang tanpa cache, lalu muat ulang halaman.'
         : '';
       setFileMessage(`Gagal membaca berkas: ${message}${compatibilityHint}`);
     } finally {

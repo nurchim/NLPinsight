@@ -352,7 +352,6 @@ export default function Home() {
               <section><h3>5. Wawasan</h3><p>{insightSummary}</p><h4>Bukti pendukung</h4><ul>{evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></section>
               <section><h3>6. Rekomendasi</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul></section>
               <section><h3>7. Keterbatasan</h3><p>Hasil hanya merepresentasikan data yang dimasukkan dan kurun waktu yang ditetapkan. Analisis sentimen, kategori, serta ringkasan bersifat indikatif dan perlu dibaca bersama konteks organisasi. Untuk PDF, aplikasi hanya menganalisis teks yang dapat diekstrak; dokumen hasil pindai tanpa lapisan teks memerlukan OCR.</p></section>
-              <section className="method-note"><h3>Catatan Metode</h3><p>Analisis memakai ekstraksi teks PDF dengan PDF.js (bila sumber berupa PDF), normalisasi teks, tokenisasi, kamus sentimen, klasifikasi berbasis kata kunci, ekstraksi kata kunci, dan peringkasan teks (text summarization) ekstraktif. Pendekatan dibuat transparan agar proses NLP mudah dipahami oleh mahasiswa.</p></section>
             </article>}
           </>}
 

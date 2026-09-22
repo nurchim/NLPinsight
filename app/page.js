@@ -270,7 +270,7 @@ export default function Home() {
         <section className="content">
           {step === 'konteks' && <>
             <div className="page-heading"><div><span className="eyebrow">LANGKAH 1</span><h2>Konteks Analisis</h2><p>Cukup jelaskan konteks, sumber data, dan kurun waktu data.</p></div></div>
-            <InfoBox><b>Mulai dari kebutuhan informasi.</b> Mahasiswa tidak perlu memilih algoritma. Aplikasi akan menjalankan analisis NLP secara otomatis setelah data dimasukkan.</InfoBox>
+            <InfoBox><b>Mulai dari kebutuhan informasi.</b> Aplikasi akan menjalankan analisis NLP secara otomatis setelah data dimasukkan.</InfoBox>
             <div className="card form-card">
               <label>Bidang / tempat kerja<input value={project.workplace} onChange={e => setProject(p => ({...p, workplace:e.target.value}))} placeholder="Contoh: Layanan Akademik Perguruan Tinggi" /></label>
               <label>Apa yang ingin diketahui?<textarea value={project.purpose} onChange={e => setProject(p => ({...p, purpose:e.target.value}))} placeholder="Contoh: Mengetahui masalah yang paling sering disampaikan mahasiswa melalui layanan chat." /></label>

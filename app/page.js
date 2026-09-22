@@ -200,7 +200,11 @@ export default function Home() {
       setTexts([]);
       setRawText('');
       setSourceMeta(initialSourceMeta);
-      setFileMessage(`Gagal membaca berkas: ${err.message}`);
+      const message = String(err?.message || err || 'Kesalahan tidak diketahui.');
+      const compatibilityHint = message.includes('toHex')
+        ? ' Komponen PDF pada deployment belum terbarui. Jalankan npm install lalu deploy ulang agar worker kompatibilitas PDF.js dibuat.'
+        : '';
+      setFileMessage(`Gagal membaca berkas: ${message}${compatibilityHint}`);
     } finally {
       setIsReadingFile(false);
       if (e.target) e.target.value = '';

@@ -10,12 +10,25 @@ import {
   generateRecommendations,
   normalizeText
 } from '../lib/nlp';
+import { extractPdfTexts } from '../lib/pdf';
 
 const STEPS = [
   ['konteks', '1', 'Konteks'],
-  ['data', '2', 'Data Teks'],
+  ['data', '2', 'Data / Dokumen'],
   ['hasil', '3', 'Hasil dan Laporan']
 ];
+
+const initialSourceMeta = {
+  fileName: '',
+  fileType: '',
+  fileSize: 0,
+  pageCount: 0,
+  pagesWithText: 0,
+  characterCount: 0,
+  segmentCount: 0,
+  documentTitle: '',
+  truncated: false
+};
 
 const initialProject = {
   title: 'Analisis Data Teks Tempat Kerja',
@@ -88,18 +101,21 @@ export default function Home() {
   const [rawText, setRawText] = useState('');
   const [texts, setTexts] = useState([]);
   const [fileMessage, setFileMessage] = useState('');
+  const [sourceMeta, setSourceMeta] = useState(initialSourceMeta);
+  const [isReadingFile, setIsReadingFile] = useState(false);
   const [summaryLength, setSummaryLength] = useState(3);
   const [hydrated, setHydrated] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('text2insight-state-v2') || 'null');
+      const saved = JSON.parse(localStorage.getItem('text2insight-state-v3') || localStorage.getItem('text2insight-state-v2') || 'null');
       if (saved) {
         setProject({ ...initialProject, ...(saved.project || {}) });
         setRawText(saved.rawText || '');
         setTexts(saved.texts || []);
         setSummaryLength(saved.summaryLength || 3);
+        setSourceMeta({ ...initialSourceMeta, ...(saved.sourceMeta || {}) });
       }
     } catch {}
     setHydrated(true);
@@ -107,18 +123,28 @@ export default function Home() {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem('text2insight-state-v2', JSON.stringify({ project, rawText, texts, summaryLength }));
-  }, [hydrated, project, rawText, texts, summaryLength]);
+    try {
+      localStorage.setItem('text2insight-state-v3', JSON.stringify({ project, rawText, texts, summaryLength, sourceMeta }));
+    } catch {
+      // Dokumen besar dapat melampaui kapasitas localStorage. Analisis tetap berjalan pada sesi aktif.
+    }
+  }, [hydrated, project, rawText, texts, summaryLength, sourceMeta]);
 
   const analysis = useMemo(() => analyzeDataset(texts, DEFAULT_CATEGORIES, summaryLength), [texts, summaryLength]);
-  const evidence = useMemo(() => generateEvidence(analysis), [analysis]);
-  const insightSummary = useMemo(() => generateInsightSummary(analysis, project.dataPeriod), [analysis, project.dataPeriod]);
-  const recommendations = useMemo(() => generateRecommendations(analysis), [analysis]);
+  const evidence = useMemo(() => generateEvidence(analysis, { isDocument: sourceMeta.fileType === 'PDF' }), [analysis, sourceMeta.fileType]);
+  const insightSummary = useMemo(() => generateInsightSummary(analysis, project.dataPeriod, { isDocument: sourceMeta.fileType === 'PDF' }), [analysis, project.dataPeriod, sourceMeta.fileType]);
+  const recommendations = useMemo(() => generateRecommendations(analysis, { isDocument: sourceMeta.fileType === 'PDF' }), [analysis, sourceMeta.fileType]);
 
   function usePastedData(goToResults = false) {
-    const list = rawText.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const splitter = sourceMeta.fileType === 'PDF' ? /\n{2,}/ : /\r?\n/;
+    const list = rawText.split(splitter).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
     setTexts(list);
-    setFileMessage(list.length ? `${list.length} teks berhasil dimuat.` : 'Belum ada teks yang dapat dimuat.');
+    if (sourceMeta.fileType === 'PDF') {
+      setSourceMeta(meta => ({ ...meta, segmentCount: list.length, characterCount: list.join(' ').length }));
+    } else {
+      setSourceMeta(initialSourceMeta);
+    }
+    setFileMessage(list.length ? `${list.length} segmen teks siap dianalisis.` : 'Belum ada teks yang dapat dimuat.');
     if (list.length && goToResults) setStep('hasil');
   }
 
@@ -132,20 +158,51 @@ export default function Home() {
       dataSource: p.dataSource || 'Pesan layanan mahasiswa',
       dataPeriod: p.dataPeriod || 'Januari–Juni 2026'
     }));
+    setSourceMeta({ ...initialSourceMeta, fileType: 'Contoh data', segmentCount: SAMPLE_TEXTS.length });
     setFileMessage('Data contoh berhasil dimuat.');
   }
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsReadingFile(true);
+    setFileMessage(`Membaca ${file.name}...`);
+
     try {
-      const content = await file.text();
-      const list = extractTextsFromFile(file.name, content);
+      const lower = file.name.toLowerCase();
+      let list = [];
+      let meta = { ...initialSourceMeta, fileName: file.name, fileSize: file.size };
+
+      if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
+        const result = await extractPdfTexts(file);
+        list = result.texts;
+        meta = result.meta;
+        setProject(p => ({
+          ...p,
+          dataSource: p.dataSource || `Dokumen PDF: ${file.name}`
+        }));
+      } else {
+        const content = await file.text();
+        list = extractTextsFromFile(file.name, content);
+        meta.fileType = lower.endsWith('.csv') ? 'CSV' : lower.endsWith('.json') ? 'JSON' : 'TXT';
+        meta.characterCount = list.join(' ').length;
+        meta.segmentCount = list.length;
+      }
+
       setTexts(list);
-      setRawText(list.join('\n'));
-      setFileMessage(`${list.length} teks berhasil dibaca dari ${file.name}.`);
+      setRawText(list.join('\n\n'));
+      setSourceMeta(meta);
+      const pdfNote = meta.fileType === 'PDF' ? ` dari ${meta.pageCount} halaman PDF` : '';
+      const limitNote = meta.truncated ? ' Analisis dibatasi pada 800 segmen pertama agar tetap responsif.' : '';
+      setFileMessage(`${list.length} segmen teks berhasil dibaca${pdfNote} dari ${file.name}.${limitNote}`);
     } catch (err) {
+      setTexts([]);
+      setRawText('');
+      setSourceMeta(initialSourceMeta);
       setFileMessage(`Gagal membaca berkas: ${err.message}`);
+    } finally {
+      setIsReadingFile(false);
+      if (e.target) e.target.value = '';
     }
   }
 
@@ -156,12 +213,14 @@ export default function Home() {
     setTexts([]);
     setSummaryLength(3);
     setFileMessage('');
+    setSourceMeta(initialSourceMeta);
     setStep('konteks');
     localStorage.removeItem('text2insight-state-v2');
+    localStorage.removeItem('text2insight-state-v3');
   }
 
   function exportJson() {
-    const blob = new Blob([JSON.stringify({ project, texts, analysis, evidence, insightSummary, recommendations }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ project, sourceMeta, texts, analysis, evidence, insightSummary, recommendations }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -218,30 +277,33 @@ export default function Home() {
           </>}
 
           {step === 'data' && <>
-            <div className="page-heading"><div><span className="eyebrow">LANGKAH 2</span><h2>Masukkan Data Teks</h2><p>Tempel satu teks per baris atau unggah berkas.</p></div><button className="secondary" onClick={loadSample}>Muat Data Contoh</button></div>
+            <div className="page-heading"><div><span className="eyebrow">LANGKAH 2</span><h2>Masukkan Data Teks atau Dokumen</h2><p>Tempel teks atau unggah TXT, CSV, JSON, dan PDF.</p></div><button className="secondary" onClick={loadSample}>Muat Data Contoh</button></div>
             <InfoBox tone="warning"><b>Perlindungan data.</b> Jangan unggah kata sandi, NIK, nomor rekening, rekam medis, data pelanggan rahasia, atau informasi internal yang tidak diizinkan.</InfoBox>
             <div className="card">
               <div className="upload-row">
-                <div><b>Unggah berkas</b><p>Format: TXT, CSV, atau JSON. Untuk CSV, gunakan kolom <code>teks</code>, <code>text</code>, <code>komentar</code>, <code>pesan</code>, atau <code>ulasan</code>.</p></div>
-                <input ref={fileRef} type="file" accept=".txt,.csv,.json" onChange={handleFile} hidden />
-                <button className="secondary" onClick={() => fileRef.current?.click()}>Pilih Berkas</button>
+                <div><b>Unggah data atau dokumen</b><p>Format: TXT, CSV, JSON, atau PDF. PDF maksimum 20 MB dan 120 halaman. Teks diekstrak langsung di peramban lalu dianalisis sebagai segmen-segmen dokumen.</p></div>
+                <input ref={fileRef} type="file" accept=".txt,.csv,.json,.pdf,text/plain,text/csv,application/json,application/pdf" onChange={handleFile} hidden />
+                <button className="secondary" onClick={() => fileRef.current?.click()} disabled={isReadingFile}>{isReadingFile ? 'Membaca Berkas...' : 'Pilih Berkas'}</button>
               </div>
+              {sourceMeta.fileType === 'PDF' && <div className="pdf-status"><div className="pdf-icon">PDF</div><div><b>{sourceMeta.fileName}</b><p>{sourceMeta.pageCount} halaman · {sourceMeta.pagesWithText} halaman memiliki teks · {sourceMeta.segmentCount} segmen dianalisis</p>{sourceMeta.documentTitle && <small>Judul dokumen: {sourceMeta.documentTitle}</small>}</div></div>}
               <div className="divider"><span>atau tempel data</span></div>
               <label>Data teks<textarea className="data-area" value={rawText} onChange={e => setRawText(e.target.value)} placeholder={'Satu teks per baris.\nContoh:\nAplikasi sangat lambat.\nPetugas sangat membantu.'} /></label>
               <div className="button-row"><button onClick={() => usePastedData(true)}>Analisis NLP Sekarang</button><button className="secondary" onClick={() => usePastedData(false)}>Muat Data</button><span className="muted">{fileMessage}</span></div>
             </div>
-            {texts.length > 0 && <div className="metrics-grid"><Metric label="Jumlah teks" value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Kurun waktu" value={project.dataPeriod || '-'}/></div>}
+            {texts.length > 0 && <><div className="metrics-grid"><Metric label={sourceMeta.fileType === 'PDF' ? 'Segmen PDF' : 'Jumlah teks'} value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Kurun waktu" value={project.dataPeriod || '-'}/></div>{sourceMeta.fileType === 'PDF' && <InfoBox><b>Dokumen siap dianalisis.</b> PDF memiliki {sourceMeta.pageCount} halaman dan diekstrak menjadi {texts.length} segmen teks. PDF berbasis gambar/pindai tanpa lapisan teks memerlukan OCR terlebih dahulu.</InfoBox>}</>}
           </>}
 
           {step === 'hasil' && <>
             <div className="page-heading no-print"><div><span className="eyebrow">LANGKAH 3</span><h2>Hasil NLP dan Wawasan</h2><p>Temuan, ringkasan teks, bukti, rekomendasi, dan laporan tersusun otomatis.</p></div><div className="button-row"><button className="secondary" onClick={exportJson}>Ekspor JSON</button><button onClick={()=>window.print()}>Cetak / Simpan PDF</button></div></div>
             {!texts.length ? <InfoBox tone="warning">Belum ada data. Masukkan data pada langkah 2 lalu tekan <b>Analisis NLP Sekarang</b>.</InfoBox> : <>
               <div className="metrics-grid">
-                <Metric label="Teks dianalisis" value={texts.length}/>
+                <Metric label={sourceMeta.fileType === 'PDF' ? 'Segmen PDF dianalisis' : 'Teks dianalisis'} value={texts.length}/>
                 <Metric label="Sentimen negatif" value={`${pct(analysis.sentimentCounts.Negatif,texts.length)}%`}/>
-                <Metric label="Topik dominan" value={analysis.categoriesRanked[0]?.name || '-'}/>
+                <Metric label={sourceMeta.fileType === 'PDF' ? 'Istilah dominan' : 'Topik dominan'} value={sourceMeta.fileType === 'PDF' ? (analysis.keywords[0]?.term || '-') : (analysis.categoriesRanked[0]?.name || '-')}/>
                 <Metric label="Kurun waktu" value={project.dataPeriod || '-'}/>
               </div>
+
+              {sourceMeta.fileType === 'PDF' && <div className="document-banner"><span>Dokumen PDF</span><b>{sourceMeta.documentTitle || sourceMeta.fileName}</b><small>{sourceMeta.pageCount} halaman · {sourceMeta.pagesWithText} halaman terbaca · {sourceMeta.characterCount.toLocaleString('id-ID')} karakter diekstrak</small></div>}
 
               <div className="card insight-highlight">
                 <span className="eyebrow">WAWASAN OTOMATIS</span>
@@ -250,13 +312,13 @@ export default function Home() {
               </div>
 
               <div className="card">
-                <div className="section-title-row"><div><h3>Ringkasan Teks Otomatis</h3><p className="muted">Text summarization ekstraktif memilih teks yang paling mewakili kata dan pola penting dalam keseluruhan data.</p></div><label className="summary-control">Panjang ringkasan<select value={summaryLength} onChange={e=>setSummaryLength(Number(e.target.value))}><option value={3}>Ringkas · 3</option><option value={5}>Sedang · 5</option><option value={7}>Lebih lengkap · 7</option></select></label></div>
+                <div className="section-title-row"><div><h3>Peringkasan Teks Otomatis</h3><p className="muted">Peringkasan teks (text summarization) ekstraktif memilih teks yang paling mewakili kata dan pola penting dalam keseluruhan data.</p></div><label className="summary-control">Panjang ringkasan<select value={summaryLength} onChange={e=>setSummaryLength(Number(e.target.value))}><option value={3}>Ringkas · 3</option><option value={5}>Sedang · 5</option><option value={7}>Lebih lengkap · 7</option></select></label></div>
                 <div className="summary-box">{analysis.summary.length ? <ol className="summary-list">{analysis.summary.map((s,i)=><li key={i}>{s}</li>)}</ol> : <p className="muted">Ringkasan belum tersedia.</p>}</div>
               </div>
 
               <div className="grid two align-start">
                 <div className="card"><h3>Sentimen</h3>{['Negatif','Netral','Positif'].map(k=><Bar key={k} label={k} value={analysis.sentimentCounts[k]} max={texts.length} suffix={` (${pct(analysis.sentimentCounts[k],texts.length)}%)`} />)}</div>
-                <div className="card"><h3>Topik / Kategori</h3>{analysis.categoriesRanked.slice(0,6).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div>
+                <div className="card"><h3>{sourceMeta.fileType === 'PDF' ? 'Istilah / Tema Dominan' : 'Topik / Kategori'}</h3>{sourceMeta.fileType === 'PDF' ? analysis.keywords.slice(0,6).map(x=><Bar key={x.term} label={x.term} value={x.count} max={Math.max(...analysis.keywords.map(k=>k.count),1)} />) : analysis.categoriesRanked.slice(0,6).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div>
               </div>
 
               <div className="grid two align-start">
@@ -264,20 +326,22 @@ export default function Home() {
                 <div className="card evidence-card"><h3>Bukti Utama</h3><ul>{evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></div>
               </div>
 
+              {sourceMeta.fileType === 'PDF' && analysis.entitiesRanked.length > 0 && <div className="card"><h3>Entitas Penting dalam Dokumen</h3><p className="muted">Organisasi, lokasi, tanggal, nilai, surel, atau URL yang terdeteksi dari teks PDF.</p><div className="entity-list">{analysis.entitiesRanked.map((e,i)=><div key={`${e.type}-${e.value}-${i}`}><span className="pill">{e.type}</span><b>{e.value}</b><em>{e.count}×</em></div>)}</div></div>}
+
               <div className="card"><h3>Rekomendasi Berdasarkan Temuan</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul><p className="footnote">Rekomendasi merupakan interpretasi awal berdasarkan pola teks. Verifikasi dengan kondisi nyata sebelum digunakan sebagai dasar keputusan.</p></div>
 
               <details className="card process-details"><summary>Lihat bagaimana NLP bekerja</summary><div className="process-flow"><span>Data teks</span><b>→</b><span>Normalisasi</span><b>→</b><span>Tokenisasi</span><b>→</b><span>Sentimen</span><b>→</b><span>Kategori</span><b>→</b><span>Kata kunci</span><b>→</b><span>Ringkasan</span><b>→</b><span>Wawasan</span></div></details>
 
               <article className="report">
                 <div className="report-cover"><span>TEXT2INSIGHT LAB</span><h2>{project.title || 'Laporan Analisis NLP'}</h2><p>From Text to Insight — Menggali Informasi Data Dunia Kerja dengan Natural Language Processing</p></div>
-                <section><h3>1. Konteks dan Sumber Data</h3><dl><dt>Bidang / tempat kerja</dt><dd>{project.workplace || '-'}</dd><dt>Tujuan analisis</dt><dd>{project.purpose || '-'}</dd><dt>Sumber data</dt><dd>{project.dataSource || '-'}</dd><dt>Kurun waktu data</dt><dd>{project.dataPeriod || '-'}</dd></dl></section>
-                <section><h3>2. Ringkasan Data</h3><div className="report-metrics"><Metric label="Jumlah teks" value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Rata-rata" value={`${analysis.averageLength} kata`}/></div></section>
+                <section><h3>1. Konteks dan Sumber Data</h3><dl><dt>Bidang / tempat kerja</dt><dd>{project.workplace || '-'}</dd><dt>Tujuan analisis</dt><dd>{project.purpose || '-'}</dd><dt>Sumber data</dt><dd>{project.dataSource || '-'}</dd><dt>Kurun waktu data</dt><dd>{project.dataPeriod || '-'}</dd>{sourceMeta.fileName && <><dt>Berkas dianalisis</dt><dd>{sourceMeta.fileName}</dd><dt>Jenis berkas</dt><dd>{sourceMeta.fileType || '-'}</dd></>}{sourceMeta.fileType === 'PDF' && <><dt>Jumlah halaman PDF</dt><dd>{sourceMeta.pageCount}</dd><dt>Halaman dengan teks</dt><dd>{sourceMeta.pagesWithText}</dd></>}</dl></section>
+                <section><h3>2. Ringkasan Data</h3><div className="report-metrics"><Metric label={sourceMeta.fileType === 'PDF' ? 'Jumlah segmen' : 'Jumlah teks'} value={texts.length}/><Metric label="Jumlah kata" value={analysis.totalWords}/><Metric label="Kosakata unik" value={analysis.uniqueWords}/><Metric label="Rata-rata" value={`${analysis.averageLength} kata`}/></div></section>
                 <section><h3>3. Ringkasan Teks</h3><p>{analysis.summary.join(' ') || '-'}</p></section>
-                <section><h3>4. Temuan NLP</h3><div className="grid two align-start"><div><h4>Sentimen</h4>{['Negatif','Netral','Positif'].map(k=><Bar key={k} label={k} value={analysis.sentimentCounts[k]} max={texts.length} suffix={` (${pct(analysis.sentimentCounts[k],texts.length)}%)`} />)}</div><div><h4>Topik / kategori</h4>{analysis.categoriesRanked.slice(0,5).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div></div></section>
+                <section><h3>4. Temuan NLP</h3><div className="grid two align-start"><div><h4>Sentimen</h4>{['Negatif','Netral','Positif'].map(k=><Bar key={k} label={k} value={analysis.sentimentCounts[k]} max={texts.length} suffix={` (${pct(analysis.sentimentCounts[k],texts.length)}%)`} />)}</div><div><h4>{sourceMeta.fileType === 'PDF' ? 'Istilah / tema dominan' : 'Topik / kategori'}</h4>{sourceMeta.fileType === 'PDF' ? analysis.keywords.slice(0,5).map(x=><Bar key={x.term} label={x.term} value={x.count} max={Math.max(...analysis.keywords.map(k=>k.count),1)} />) : analysis.categoriesRanked.slice(0,5).map(x=><Bar key={x.name} label={x.name} value={x.count} max={Math.max(...analysis.categoriesRanked.map(x=>x.count),1)} suffix={` (${x.pct}%)`} />)}</div></div>{sourceMeta.fileType === 'PDF' && analysis.entitiesRanked.length > 0 && <><h4>Entitas penting</h4><ul>{analysis.entitiesRanked.slice(0,8).map((e,i)=><li key={`${e.type}-${e.value}-${i}`}>{e.type}: {e.value} ({e.count} kali)</li>)}</ul></>}</section>
                 <section><h3>5. Wawasan</h3><p>{insightSummary}</p><h4>Bukti pendukung</h4><ul>{evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></section>
                 <section><h3>6. Rekomendasi</h3><ul>{recommendations.map((r,i)=><li key={i}>{r}</li>)}</ul></section>
-                <section><h3>7. Keterbatasan</h3><p>Hasil hanya merepresentasikan data yang dimasukkan dan kurun waktu yang ditetapkan. Analisis sentimen, kategori, serta ringkasan bersifat indikatif dan perlu dibaca bersama konteks organisasi.</p></section>
-                <section className="method-note"><h3>Catatan Metode</h3><p>Analisis memakai normalisasi teks, tokenisasi, kamus sentimen, klasifikasi berbasis kata kunci, ekstraksi kata kunci, dan text summarization ekstraktif. Pendekatan dibuat transparan agar proses NLP mudah dipahami oleh mahasiswa.</p></section>
+                <section><h3>7. Keterbatasan</h3><p>Hasil hanya merepresentasikan data yang dimasukkan dan kurun waktu yang ditetapkan. Analisis sentimen, kategori, serta ringkasan bersifat indikatif dan perlu dibaca bersama konteks organisasi. Untuk PDF, aplikasi hanya menganalisis teks yang dapat diekstrak; dokumen hasil pindai tanpa lapisan teks memerlukan OCR.</p></section>
+                <section className="method-note"><h3>Catatan Metode</h3><p>Analisis memakai ekstraksi teks PDF dengan PDF.js (bila sumber berupa PDF), normalisasi teks, tokenisasi, kamus sentimen, klasifikasi berbasis kata kunci, ekstraksi kata kunci, dan peringkasan teks (text summarization) ekstraktif. Pendekatan dibuat transparan agar proses NLP mudah dipahami oleh mahasiswa.</p></section>
               </article>
             </>}
           </>}

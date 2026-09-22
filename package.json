@@ -1,17 +1,19 @@
 {
   "name": "text2insight-lab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
     "next": "16.3.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "pdfjs-dist": "6.3.289"
   },
   "devDependencies": {
     "eslint": "^9.0.0",

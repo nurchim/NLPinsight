@@ -1,31 +1,43 @@
 # Text2Insight Lab
 
-Aplikasi pembelajaran **Natural Language Processing (NLP)** untuk membantu mahasiswa mengubah data teks dari konteks dunia kerja menjadi temuan, ringkasan, wawasan, bukti, rekomendasi, dan laporan.
+Aplikasi pembelajaran **Natural Language Processing (NLP)** untuk membantu mahasiswa mengubah data teks dan dokumen PDF dari konteks dunia kerja menjadi temuan, ringkasan, wawasan, bukti, rekomendasi, dan laporan.
 
 ## Alur aplikasi
 
-Aplikasi dibuat sederhana agar mudah digunakan oleh mahasiswa nonteknis:
-
 1. **Konteks** — isi bidang/tempat kerja, tujuan analisis, sumber data, dan kurun waktu data.
-2. **Data Teks** — tempel teks atau unggah TXT, CSV, atau JSON.
+2. **Data Teks atau Dokumen** — tempel teks atau unggah TXT, CSV, JSON, atau PDF.
 3. **Hasil dan Laporan** — aplikasi otomatis menjalankan NLP, text summarization, menghasilkan wawasan, bukti, rekomendasi, dan laporan.
 
 ## Fitur utama
 
 - Keterangan sumber data dan **kurun waktu data**.
-- Masukan data melalui tempel teks, TXT, CSV, atau JSON.
+- Masukan melalui tempel teks, TXT, CSV, JSON, dan **PDF**.
+- Ekstraksi teks PDF langsung di peramban menggunakan **PDF.js**.
+- PDF dipecah menjadi segmen teks agar analisis kata kunci, sentimen, topik, dan ringkasan lebih bermakna.
+- Informasi PDF pada hasil: nama berkas, jumlah halaman, halaman yang memiliki teks, karakter, dan jumlah segmen.
 - Tombol **Analisis NLP Sekarang** untuk langsung menuju hasil.
 - Analisis sentimen berbasis kamus dan aturan negasi sederhana.
 - Klasifikasi topik/kategori berbasis kata kunci yang transparan.
 - Ekstraksi kata kunci.
-- **Text summarization ekstraktif** dengan pilihan panjang 3, 5, atau 7 teks representatif.
+- **Peringkasan teks (text summarization) ekstraktif** dengan pilihan panjang 3, 5, atau 7 teks representatif.
 - Wawasan otomatis berdasarkan pola hasil NLP.
 - Bukti kuantitatif untuk mendukung wawasan.
 - Rekomendasi awal berdasarkan temuan.
-- Laporan otomatis yang memuat konteks, sumber data, kurun waktu, ringkasan teks, temuan NLP, wawasan, bukti, rekomendasi, dan keterbatasan.
+- Laporan otomatis yang memuat konteks, sumber data, kurun waktu, metadata PDF, ringkasan teks, temuan NLP, wawasan, bukti, rekomendasi, dan keterbatasan.
 - Cetak atau simpan laporan sebagai PDF melalui peramban.
 - Ekspor hasil sebagai JSON.
-- Penyimpanan otomatis menggunakan `localStorage`; data tidak dikirim ke server.
+- Penyimpanan otomatis menggunakan `localStorage`; isi dokumen tidak diunggah ke server aplikasi.
+
+## Dukungan PDF
+
+Aplikasi memakai paket `pdfjs-dist` (PDF.js) untuk membaca teks dari PDF secara lokal di peramban. Saat `npm install`, skrip `postinstall` akan menyalin worker, CMaps, font standar, dan aset WASM PDF.js ke folder `public/pdfjs` secara otomatis.
+
+Batas versi pembelajaran ini:
+
+- ukuran PDF maksimum: **20 MB**;
+- maksimum: **120 halaman** per dokumen;
+- maksimum: **800 segmen teks** untuk menjaga aplikasi tetap responsif;
+- PDF hasil pindai/gambar tanpa lapisan teks **belum mendukung OCR**. Lakukan OCR terlebih dahulu atau gunakan PDF yang teksnya dapat dipilih/disalin.
 
 ## Teknologi
 
@@ -33,7 +45,8 @@ Aplikasi dibuat sederhana agar mudah digunakan oleh mahasiswa nonteknis:
 - React 19
 - JavaScript
 - CSS murni
-- Tidak memerlukan API eksternal atau kunci API
+- PDF.js / `pdfjs-dist` 6.3.289
+- Tidak memerlukan API AI eksternal atau kunci API
 
 ## Persyaratan
 
@@ -49,6 +62,8 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
+`npm install` otomatis menjalankan `scripts/copy-pdf-worker.mjs` sehingga dukungan PDF siap digunakan.
+
 ## Build produksi
 
 ```bash
@@ -61,7 +76,7 @@ npm start
 ```bash
 git init
 git add .
-git commit -m "Initial commit: Text2Insight Lab"
+git commit -m "Text2Insight Lab dengan analisis PDF"
 git branch -M main
 git remote add origin https://github.com/NAMA-PENGGUNA/NAMA-REPOSITORI.git
 git push -u origin main
@@ -72,13 +87,17 @@ git push -u origin main
 1. Masuk ke Vercel menggunakan akun GitHub.
 2. Pilih **Add New Project**.
 3. Impor repositori Text2Insight Lab.
-4. Vercel akan mendeteksi Next.js secara otomatis.
+4. Vercel mendeteksi Next.js secara otomatis.
 5. Gunakan Node.js 24 sesuai `package.json`.
 6. Klik **Deploy**.
 
-Tidak ada variabel lingkungan yang diperlukan.
+Tidak ada variabel lingkungan yang diperlukan. Pada proses instalasi, `postinstall` menyiapkan aset PDF.js di `public/pdfjs/`.
 
 ## Format data
+
+### PDF
+
+Pilih berkas `.pdf`. Aplikasi mengekstrak teks, memecahnya menjadi segmen, kemudian menjalankan analisis NLP. Dokumen tidak dikirim ke backend aplikasi.
 
 ### TXT
 
@@ -120,7 +139,7 @@ atau:
 
 ## Cara kerja text summarization
 
-Versi ini menggunakan **ringkasan ekstraktif**. Sistem menghitung kata-kata penting dalam keseluruhan data, memberi skor pada setiap teks, kemudian memilih 3, 5, atau 7 teks yang paling representatif. Pendekatan ini sengaja dibuat transparan agar mahasiswa dapat memahami bagaimana ringkasan diperoleh tanpa bergantung pada model generatif eksternal.
+Versi ini menggunakan **ringkasan ekstraktif**. Sistem menghitung kata-kata penting dalam keseluruhan data, memberi skor pada setiap segmen, kemudian memilih 3, 5, atau 7 segmen yang paling representatif.
 
 ## Catatan akademik
 
@@ -128,4 +147,4 @@ Hasil NLP merupakan indikasi awal. Wawasan dan rekomendasi perlu dibaca bersama 
 
 ## Privasi
 
-Seluruh proses utama berjalan di peramban. Data dan proyek tersimpan pada `localStorage`. Jangan memasukkan data pribadi, rahasia, atau data organisasi yang tidak diizinkan.
+Proses analisis utama berjalan di peramban. Data proyek disimpan pada `localStorage` bila kapasitas peramban mencukupi. Jangan memasukkan data pribadi, rahasia, atau data organisasi yang tidak diizinkan.
